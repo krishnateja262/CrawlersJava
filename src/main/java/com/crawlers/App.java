@@ -1,14 +1,10 @@
 package com.crawlers;
 
 import com.crawlers.model.ConcurrentModel;
-import com.crawlers.model.SnapdealModel;
 import com.mashape.unirest.http.HttpResponse;
 import com.mashape.unirest.http.Unirest;
 import com.mashape.unirest.http.exceptions.UnirestException;
 import com.mongodb.*;
-import org.jsoup.Jsoup;
-import org.jsoup.nodes.Element;
-import org.jsoup.select.Elements;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.w3c.dom.Document;
@@ -165,7 +161,8 @@ public class App
 
             if(unparsedUrls.hasNext()){
                 while (unparsedUrls.hasNext()){
-                    ArrayList<String> productUrls = (ArrayList<String>) unparsedUrls.next().get("urls");
+                    DBObject object = unparsedUrls.next();
+                    ArrayList<String> productUrls = (ArrayList<String>) object.get("urls");
                     BulkWriteOperation builder = products.initializeOrderedBulkOperation();
                     ConcurrentModel concurrentModel = ConcurrentAsyncHttpClient.getUrlBody(productUrls);
 
@@ -179,6 +176,9 @@ public class App
 
                     if(hasNext){
                         builder.execute();
+                        DBObject modifiedState = new BasicDBObject();
+                        modifiedState.put("$set",new BasicDBObject().append("crawled",true));
+                        coll.update(object,modifiedState);
                     }
 
                     Iterator failedUrlIterator = concurrentModel.getUrlFailedConcurrentLinkedQueue().iterator();
