@@ -6,8 +6,6 @@ import com.mashape.unirest.http.Unirest;
 import com.mashape.unirest.http.async.Callback;
 import com.mashape.unirest.http.exceptions.UnirestException;
 import com.mongodb.BasicDBObject;
-import com.mongodb.DBCollection;
-import com.mongodb.DBObject;
 import com.mongodb.util.JSON;
 import org.json.JSONObject;
 import org.jsoup.Jsoup;
@@ -36,7 +34,7 @@ public class ConcurrentAsyncHttpClient {
 
     }
 
-    public static ConcurrentModel getUrlBody(ArrayList<String> urls, final DBCollection products){
+    public static ConcurrentModel getUrlBody(ArrayList<String> urls){
 
         Unirest.setTimeouts(100000,100000);
         Unirest.setConcurrency(200,200);
@@ -54,8 +52,6 @@ public class ConcurrentAsyncHttpClient {
                         if(snapdealModel!=null) {
                             JSONObject jsonObject = new JSONObject(snapdealModel);
                             BasicDBObject dbObject = (BasicDBObject) JSON.parse(jsonObject.toString());
-                            DBObject modifiedObj = new BasicDBObject("$set",new BasicDBObject(dbObject));
-                            products.update(new BasicDBObject("url",url),modifiedObj,true,false);
                             concurrentModel.getConcurrentLinkedQueue().add(dbObject);
                         }else{
                             concurrentModel.getUrlFailedConcurrentLinkedQueue().add(url);

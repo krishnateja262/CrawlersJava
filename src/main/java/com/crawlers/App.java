@@ -172,7 +172,23 @@ public class App
             for(String id:unparsedUrlIds){
                 DBObject object = coll.findOne(new BasicDBObject("_id", new ObjectId(id)));
                 ArrayList<String> productUrls = (ArrayList<String>) object.get("urls");
-                ConcurrentModel concurrentModel = ConcurrentAsyncHttpClient.getUrlBody(productUrls,products);
+                ConcurrentModel concurrentModel = ConcurrentAsyncHttpClient.getUrlBody(productUrls);
+
+                BulkWriteOperation builder = products.initializeOrderedBulkOperation();
+                Iterator productsIterator = concurrentModel.getConcurrentLinkedQueue().iterator();
+                boolean hasNext = false;
+                while (productsIterator.hasNext()){
+                    hasNext = true;
+                    BasicDBObject dbObject = (BasicDBObject) productsIterator.next();
+                    builder.find(new BasicDBObject("url", dbObject.get("url").toString())).upsert().update(new BasicDBObject("$set", dbObject));
+                }
+
+                if(hasNext){
+                    builder.execute();
+                    DBObject modifiedState = new BasicDBObject();
+                    modifiedState.put("$set",new BasicDBObject().append("crawled",true));
+                    coll.update(object,modifiedState);
+                }
 
                 Iterator failedUrlIterator = concurrentModel.getUrlFailedConcurrentLinkedQueue().iterator();
                 while (failedUrlIterator.hasNext()){
