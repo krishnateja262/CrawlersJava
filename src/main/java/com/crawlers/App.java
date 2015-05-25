@@ -5,6 +5,7 @@ import com.mashape.unirest.http.HttpResponse;
 import com.mashape.unirest.http.Unirest;
 import com.mashape.unirest.http.exceptions.UnirestException;
 import com.mongodb.*;
+import org.bson.types.ObjectId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.w3c.dom.Document;
@@ -153,22 +154,23 @@ public class App
         if(crawlingState < 2){
             logger.info("Started crawling!!");
 
-            DBCursor unparsedUrls = coll.find(new BasicDBObject("crawled",false)).addOption(Bytes.QUERYOPTION_NOTIMEOUT).limit(5);
+            DBCursor unparsedUrls = coll.find(new BasicDBObject("crawled",false)).addOption(Bytes.QUERYOPTION_NOTIMEOUT);
 
             DBObject modifiedCrawlStatus = new BasicDBObject();
             modifiedCrawlStatus.put("$set", new BasicDBObject().append("productUrlState", crawled).append("crawlingState", crawling));
             crawlStatus.update(new BasicDBObject("name", "status"), modifiedCrawlStatus, true, false);
 
-            ArrayList<DBObject> unparsedObjects = new ArrayList<DBObject>();
+            ArrayList<String> unparsedUrlIds = new ArrayList<String>();
 
             if(unparsedUrls.hasNext()){
                 while (unparsedUrls.hasNext()){
                     DBObject object = unparsedUrls.next();
-                    unparsedObjects.add(object);
+                    unparsedUrlIds.add(object.get("_id").toString());
                 }
             }
 
-            for(DBObject object:unparsedObjects){
+            for(String id:unparsedUrlIds){
+                DBObject object = coll.findOne(new BasicDBObject("_id", new ObjectId(id)));
                 ArrayList<String> productUrls = (ArrayList<String>) object.get("urls");
                 ConcurrentModel concurrentModel = ConcurrentAsyncHttpClient.getUrlBody(productUrls);
 
