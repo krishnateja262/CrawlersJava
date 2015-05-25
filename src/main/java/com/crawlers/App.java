@@ -62,7 +62,7 @@ public class App
         DBCollection products = db.getCollection("java_products");
         DBCollection failedUrls= db.getCollection("java_failed_urls");
 
-        DBCursor cursor = crawlStatus.find(new BasicDBObject("name", "status"));
+        DBCursor cursor = crawlStatus.find(new BasicDBObject("name", "status")).addOption(Bytes.QUERYOPTION_NOTIMEOUT);
         int productUrlState = 0;
         int crawlingState = 0;
 
@@ -159,37 +159,42 @@ public class App
             modifiedCrawlStatus.put("$set", new BasicDBObject().append("productUrlState", crawled).append("crawlingState", crawling));
             crawlStatus.update(new BasicDBObject("name", "status"), modifiedCrawlStatus, true, false);
 
+            ArrayList<DBObject> unparsedObjects = new ArrayList<DBObject>();
+
             if(unparsedUrls.hasNext()){
                 while (unparsedUrls.hasNext()){
                     DBObject object = unparsedUrls.next();
-                    ArrayList<String> productUrls = (ArrayList<String>) object.get("urls");
-                    BulkWriteOperation builder = products.initializeOrderedBulkOperation();
-                    ConcurrentModel concurrentModel = ConcurrentAsyncHttpClient.getUrlBody(productUrls);
+                    unparsedObjects.add(object);
+                }
+            }
 
-                    Iterator productsIterator = concurrentModel.getConcurrentLinkedQueue().iterator();
-                    boolean hasNext = false;
-                    while (productsIterator.hasNext()){
-                        hasNext = true;
-                        BasicDBObject dbObject = (BasicDBObject) productsIterator.next();
-                        builder.find(new BasicDBObject("url", dbObject.get("url").toString())).upsert().update(new BasicDBObject("$set", dbObject));
-                    }
+            for(DBObject object:unparsedObjects){
+                ArrayList<String> productUrls = (ArrayList<String>) object.get("urls");
+                ConcurrentModel concurrentModel = ConcurrentAsyncHttpClient.getUrlBody(productUrls);
 
-                    if(hasNext){
-                        builder.execute();
-                        DBObject modifiedState = new BasicDBObject();
-                        modifiedState.put("$set",new BasicDBObject().append("crawled",true));
-                        coll.update(object,modifiedState);
-                    }
+                BulkWriteOperation builder = products.initializeOrderedBulkOperation();
+                Iterator productsIterator = concurrentModel.getConcurrentLinkedQueue().iterator();
+                boolean hasNext = false;
+                while (productsIterator.hasNext()){
+                    hasNext = true;
+                    BasicDBObject dbObject = (BasicDBObject) productsIterator.next();
+                    builder.find(new BasicDBObject("url", dbObject.get("url").toString())).upsert().update(new BasicDBObject("$set", dbObject));
+                }
 
-                    Iterator failedUrlIterator = concurrentModel.getUrlFailedConcurrentLinkedQueue().iterator();
-                    while (failedUrlIterator.hasNext()){
-                        BasicDBObject failedObject = new BasicDBObject().append("url",failedUrlIterator.next().toString());
-                        failedUrls.insert(failedObject);
-                    }
+                if(hasNext){
+                    builder.execute();
+                    DBObject modifiedState = new BasicDBObject();
+                    modifiedState.put("$set",new BasicDBObject().append("crawled",true));
+                    coll.update(object,modifiedState);
+                }
+
+                Iterator failedUrlIterator = concurrentModel.getUrlFailedConcurrentLinkedQueue().iterator();
+                while (failedUrlIterator.hasNext()){
+                    BasicDBObject failedObject = new BasicDBObject().append("url",failedUrlIterator.next().toString());
+                    failedUrls.insert(failedObject);
                 }
             }
             logger.info("Crawling Done!!");
-
         }//main crawling block
     }
 }
