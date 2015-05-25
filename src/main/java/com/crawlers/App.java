@@ -153,7 +153,7 @@ public class App
         if(crawlingState < 2){
             logger.info("Started crawling!!");
 
-            DBCursor unparsedUrls = coll.find(new BasicDBObject("crawled",false)).addOption(Bytes.QUERYOPTION_NOTIMEOUT).limit(100);
+            DBCursor unparsedUrls = coll.find(new BasicDBObject("crawled",false)).addOption(Bytes.QUERYOPTION_NOTIMEOUT).limit(50);
 
             DBObject modifiedCrawlStatus = new BasicDBObject();
             modifiedCrawlStatus.put("$set", new BasicDBObject().append("productUrlState", crawled).append("crawlingState", crawling));
